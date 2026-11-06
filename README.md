@@ -1,86 +1,110 @@
 # AccessTrail
 
-Check the whole visit, not just the entrance. AccessTrail researches published venue accessibility information using **TinyFish**, then exposes support, limitations, conflicts and missing information for five practical requirements.
+**Check the whole visit, not just the entrance.** AccessTrail uses TinyFish to research official venue accessibility information and turns it into evidence, restrictions, unanswered questions and a venue enquiry.
 
-Built by **Aditya Singhal** for **Tiny Hacks 2026**. Created with AI assistance. No physical accessibility certification or user-study results are claimed.
+**[Open the deployed app](https://accesstrail.adityasinghal074.chatgpt.site)** · [Tiny Hacks 2026](https://unstop.com/hackathons/tiny-hacks-vishveshwarya-group-of-institutions-vgi-greater-noida-uttar-pradesh-1771573)
 
-## Try it
+Built by **Aditya Singhal** with AI assistance. A working research MVP; no physical inspections, user-study results, partnerships or benchmark accuracy are claimed.
 
-**[Open the live app](https://accesstrail.adityasinghal074.chatgpt.site)**. The default British Museum report is based on a genuine completed TinyFish TinyAgent / Mako run on 6 November 2026. It requires no account or API key to inspect.
+## Try the complete flow
 
-1. Select your access requirements and explore the evidence cards.
-2. Open **Run provenance** to inspect the provider run reference.
-3. Choose **Conflict demo** and click **Explore conflict demo**. The fictional restroom claims conflict; unknown requirements remain unknown.
-4. Generate a venue enquiry, download the JSON, or print the report.
-5. For new live research, click **Connect TinyFish**, enter your own provider key, choose a venue and select **Live TinyFish agent**. Your provider credits apply. The key is kept in tab memory, forwarded via HTTPS to TinyFish, and not persisted by the app. Closing the tab clears it.
-6. **Source check** uses TinyFetch to retrieve a known official page and look for saved short text markers. It does not re-certify a facility or silently replace the saved evidence.
+1. Choose a venue and your practical access requirements. No diagnosis or travel dates are collected.
+2. Explore the latest saved evidence and open its official sources.
+3. Select **Live research · no key needed** and click **Check venue with TinyFish**. The API key stays on the server. A recent completed report is reused, and simultaneous requests join the same investigation.
+4. Reload during a run: this tab resumes checking its job. Completed results persist for future visitors.
+5. Open **Compare venues** to compare published support, restrictions and unknowns against the same requirements. Counts describe information, not a venue safety or suitability rating.
+6. Use **Source check** to retrieve up to three cited pages, check short evidence markers and compare with the previous check. A failed retrieval is never treated as removed information.
+7. Draft an enquiry, download the evidence JSON, print a report or share a link to a venue's latest saved report.
+8. Choose **Conflict demo** to inspect a clearly labelled fictional scenario. Both opposing restroom claims are retained and missing requirements stay unknown.
 
-## Why it matters
+## What makes it useful
 
-A ramp does not establish a step-free route to a particular gallery or restroom. Lift availability does not establish that every room is reachable. Wheelchair loans do not establish staff assistance. Companion tickets do not establish seating. AccessTrail keeps those conditions visible instead of collapsing them into a single accessibility score.
+A ramp does not establish a step-free route to a particular gallery or restroom. Available lifts can have floor restrictions. Wheelchair loans do not establish staff assistance, and companion tickets do not establish seating.
 
-## TinyFish integration and provenance
+AccessTrail preserves that context instead of issuing a universal accessible/not-accessible verdict. **Mixed evidence** means the source contains both support and restrictions within a requirement. The statements may concern different rooms or conditions; the label does not prove a factual contradiction.
 
-- Live agent: `POST https://agent.tinyfish.ai/v1/automation/run-async` starts a bounded read-only research goal on a fixed venue URL. The app polls `GET /v1/runs/{id}` through its backend, avoiding reliance on a long-lived browser stream.
-- Source check: `POST https://api.fetch.tinyfish.ai` retrieves the selected official source. A server-side key is configured separately from source code.
-- Genuine saved run: `edbf3e91-fa6e-4683-b2b8-f5fb3b4396e3` (TinyFish dashboard access may require the owner's sign-in).
-- Observed dashboard run cost: **$0.256**, one run only; this is not a general cost estimate.
-- Evidence captured: **6 November 2026**. Agent output was shortened and conservatively paraphrased for publication. The JSON includes a provenance note and source URL. It is a saved result, not a fresh browser replay.
-- Current scope: one genuine saved venue investigation, three allowlisted live venue targets, and a separate fictional conflict fixture. No benchmark accuracy, physical verification, partnerships or pilot users are claimed.
+## TinyFish is the execution layer
+
+- **TinyAgent:** `POST /v1/automation/run-async` starts read-only research on an allowlisted official venue domain. The backend polls `GET /v1/runs/{id}` and validates the completed result.
+- **TinyFetch:** retrieves cited official pages to check short evidence markers. It does not inspect physical facilities or verify equipment operation.
+- The server key is supplied as the `TINYFISH_API_KEY` production secret. It is never embedded in the client bundle or returned through public APIs.
+- Public polling can access only jobs created by this application. It cannot use the owner's key to inspect unrelated TinyFish runs.
+- The shipped British Museum example comes from genuine TinyFish run `edbf3e91-fa6e-4683-b2b8-f5fb3b4396e3`, captured 6 November 2026. Its output was shortened and conservatively paraphrased. Provider dashboard references may require the owner's sign-in.
+- A previous deployed-app end-to-end run completed under reference `5a5d80ef-76b3-4004-9b8c-41a9d842772c`. The final shared-key implementation is also tested through the deployed application before submission.
+
+## Persistence and shared allowance
+
+Cloudflare D1 stores application jobs, completed public venue reports and source-check history. Concurrent requests reserve work atomically, so an active investigation is shared rather than duplicated. Results under 24 hours old are reused. Source checks are cached for five minutes.
+
+The hackathon demo has **four sponsored research attempts in total**, enforced in the database across deployments. Failed or uncertain starts consume an attempt; the app never silently retries a paid start. This is a run-count limit, not a promise of a fixed dollar cost. Saved reports and recent source checks remain usable when the allowance is exhausted. An operator can deliberately change the allowance in source after assessing provider credits; deployments do not reset usage.
+
+The target set is intentionally small: British Museum, Smithsonian American Art Museum and National Museum in New Delhi. An investigation that cannot retrieve usable evidence stays incomplete or unknown. The app does not claim that all three venues have successful reports until those runs actually complete.
+
+## Architecture
+
+| Source | Responsibility |
+| --- | --- |
+| `src/page.html` | Responsive layout, semantic controls, print styles and accessible dialogs |
+| `src/client.js` | Saved/live research, resumption, comparisons, source checks and exports |
+| `src/core.js` | Research goal, normalization, official-domain validation and deterministic evidence states |
+| `src/server.js` | Server-only TinyFish calls, job reservations, polling, persistence and allowance |
+| `db/schema.ts` | Database schema |
+| `drizzle/` | Generated schema-only SQL migration and metadata |
+| `evidence/british-museum.json` | Genuine initial example with provenance |
+| `tests/` | Core logic, real SQLite database behavior and mocked provider integration tests |
+
+A completed result is normalized before persistence. Invalid or off-domain citations are rejected, evidence is deduplicated and explicit restrictions are kept before display limits are applied. Missing source dates stay unstated. Schema checks do not establish that an agent's interpretation is correct; source context must still be reviewed.
 
 ## Run locally
 
-Requires Node.js 22+; no npm dependencies.
+Requires **Node.js 22.13 or newer**. The application runtime has no third-party dependencies. SQLite is provided by Node for local preview and tests.
 
 ```sh
-node scripts/assemble.mjs
+npm run build
 npm test
 npm run dev
 ```
 
-Open `http://localhost:3000`. To enable source checks locally, supply `TINYFISH_API_KEY` as an environment variable. Do not commit keys. Live research uses the visitor's key and does not require a shared metered key.
+Open `http://localhost:3000`. Local preview creates a new in-memory SQLite database on startup. Set `TINYFISH_API_KEY` in your environment to enable live local research; it is optional for browsing the saved example. Never commit the key.
+
+Schema development uses the pinned dev dependencies:
+
+```sh
+npm ci
+npm run db:generate
+```
+
+Production uses Cloudflare D1 through the `DB` binding. The generated migration is included in the deployment artifact and applied during publication. The local development database is separate from hosted data.
 
 ```sh
 npm run build
 npm run validate
 ```
 
-Production is a standard Fetch API Worker module at `dist/server/index.js`. `scripts/assemble.mjs` combines the readable source files into `worker/index.js`; `scripts/build.sh` packages it. The preview adapter uses the same Worker handler under Node.
+`worker/index.js` is generated from the readable source by `scripts/assemble.mjs`. The build packages it as `dist/server/index.js` with the hosting manifest and generated database migration.
 
-## Architecture
+## Validation
 
-| File | Responsibility |
-| --- | --- |
-| `src/page.html` | Responsive UI, semantic forms, keyboard-accessible tabs, print layout |
-| `src/client.js` | Selection, saved/live modes, background-run polling, enquiry and JSON export |
-| `src/core.js` | Prompt, schema checks, trusted source filtering, deterministic requirement states |
-| `src/server.js` | Same-origin API, TinyFish proxy, source-marker verification |
-| `evidence/british-museum.json` | Genuine recorded research with source links and provenance |
-| `tests/core.test.js` | Tests for conflicts, unknowns, invalid evidence, credential checks and API boundaries |
+The current suite contains **27 checks**, covering evidence states, malformed input, official-domain filtering, durable quotas, concurrent reservation, cache reuse, server-only credentials, unrelated run isolation, persistence, source-check failure handling and quote limits. GitHub Actions runs tests, build and artifact validation on pushes.
 
-The reducer requires a nonempty evidence excerpt and an HTTPS URL on the selected venue domain. It deduplicates identical records, preserves contradictory claims, and never fills a missing requirement with another requirement's evidence. It validates provenance structure; it cannot establish that the source content is correct or current. Review source context.
+Browser QA covers the report, comparison navigation, enquiry draft, fixture and the production research flow. No statistical extraction-accuracy claim is made from these software tests.
 
-## Privacy and limitations
+## Limitations and privacy
 
-No diagnosis, account profile or location is collected. No automatic bookings or emails. API keys are never embedded in browser bundles, source or reports. Venue targets are allowlisted; the server is not an arbitrary URL proxy. Live keys are sent only to the TinyFish API. CSP and same-origin checks reduce unintended cross-site use.
+Venue websites can be stale, blocked, inconsistent or incomplete. Source checks match short text, so a wording change can remove a marker without changing a facility. A failed fetch is recorded separately. A report is research about published claims, not an accessibility certification, a route planner or a booking guarantee. Confirm critical details directly with the venue.
 
-TinyFish may fail, time out or be blocked by a venue. Live failure leaves the previous report unchanged and shows an error. A missing text marker can be a wording change or retrieval problem; it is never treated as proof a facility was removed. Source checking inspects one page, not every linked source. Review all critical requirements with the venue. No guarantee of wheelchair suitability, room access, equipment operation, legal compliance or physical safety is made.
+Reports contain public venue information and are shared. Requirement selections stay in the browser. No diagnosis, precise location or travel dates are collected. No automatic emails, ticket purchases or bookings are performed. A venue share link opens its latest report, not an immutable snapshot; export JSON when you need a fixed copy.
 
-The original proposal described a broader Delhi NCR pilot and 50-case evaluation. This MVP deliberately delivers a smaller verifiable scope. A Delhi venue is available as a live target, but no Delhi investigation is represented as completed.
+The original proposal described a broader Delhi NCR pilot and a 50-case evaluation. This implementation delivers a smaller verifiable MVP; that proposed pilot and evaluation are not claimed as completed.
 
-## Demo in three minutes
+## Three-minute demonstration
 
-0:00 — Explain the gap between an entrance label and a complete visit.
-
-0:25 — Open the genuine British Museum evidence. Show gallery exceptions and the distinction between wheelchair loans and staff assistance.
-
-1:15 — Open provenance and the official source.
-
-1:40 — Run the labelled fictional conflict scenario. Show the unresolved restroom and missing lift evidence.
-
-2:10 — Draft a venue enquiry and export the report.
-
-2:35 — Explain live TinyFish research, source checking, current limits and the next step of user-led validation.
+- **0:00:** Explain why an entrance label cannot describe the complete visit.
+- **0:25:** Open evidence, show restrictions and check an official source.
+- **1:00:** Compare venue information using the same selected requirements.
+- **1:30:** Show live TinyFish research without entering a key, or its explicitly dated cached result.
+- **2:00:** Use the labelled fictional conflict scenario and draft the unresolved questions.
+- **2:35:** Show provenance, source checking and honest limitations.
 
 ## References
 
@@ -88,4 +112,4 @@ The original proposal described a broader Delhi NCR pilot and 50-case evaluation
 - [TinyFish official cookbook](https://github.com/tinyfish-io/tinyfish-cookbook)
 - [British Museum accessibility information](https://www.britishmuseum.org/visit/accessibility-museum)
 
-The application code is MIT licensed. Venue statements and provider material remain subject to their respective rights.
+Application code is MIT licensed. Venue and provider material retain their respective rights.

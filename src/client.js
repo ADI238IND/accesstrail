@@ -1,66 +1,90 @@
 const $=id=>document.getElementById(id);
-const labels={supported:'Published support',contradicted:'Published limitation',conflict:'Conflicting claims',unknown:'Not established',failed:'Retrieval failed'};
-let current=RECORDED,rows=[],key='',busy=false,activeView='evidence',lastVenue='british';
+const labels={supported:'Published support',contradicted:'Published limitation',conflict:'Mixed evidence',unknown:'Not established',failed:'Retrieval failed'};
+let current=RECORDED,rows=[],busy=false,activeView='evidence',catalog=VENUES.map(v=>({...v,report:v.id==='british'?RECORDED:null}));
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const selected=()=>[...document.querySelectorAll('#requirements input:checked')].map(e=>e.value);
 const venue=()=>VENUES.find(v=>v.id===$('venue').value);
 const status=(s,error=false)=>{$('status').textContent=s;$('status').classList.toggle('error',error);};
 $('requirements').innerHTML=REQUIREMENTS.map(r=>'<label class="check"><input type="checkbox" value="'+r.id+'" checked>'+esc(r.label)+'</label>').join('');
 function render(){
- const v=venue();rows=reduceReport(current,selected(),v.host);
+ const v=venue();rows=reduceReport(current,selected(),current?.mode==='fixture'?location.hostname:v.host);
  $('report-title').textContent=current?.venue_name||v.name;
  $('report-meta').textContent=(current?.mode==='fixture'?'Controlled test scenario':v.city)+' · '+(current?.checked_at?'Research captured '+current.checked_at:'No completed research yet');
- $('report-tag').textContent=current?.mode==='fixture'?'Controlled fixture · not a real venue':current?.mode==='live'?'Live TinyFish result':'Recorded TinyFish run';
- if(!current){$('view-evidence').innerHTML='<div class="empty"><h3>A fresh trail starts here.</h3><p>No saved run is available for this venue. Connect TinyFish and run a live investigation. Missing data is never filled with another venue’s evidence.</p></div>'; $('view-trace').innerHTML='<p>No run has completed for this venue.</p>';return;}
+ $('report-tag').textContent=!current?'Awaiting research':current?.mode==='fixture'?'Controlled fixture · not a real venue':current?.mode==='live'?'Live TinyFish result':current?.mode==='cached'?'Latest saved TinyFish result':'Recorded TinyFish run';
+ if(!current){$('view-evidence').innerHTML='<div class="empty"><h3>A fresh trail starts here.</h3><p>No saved run is available yet. Choose Live research to investigate this venue. No account or API key is needed. Missing details stay unknown.</p></div>'; $('view-trace').innerHTML='<p>No run has completed for this venue.</p>';return;}
  const supported=rows.filter(r=>r.state==='supported').length;
  const caution=rows.some(r=>['conflict','contradicted','failed'].includes(r.state));
- $('view-evidence').innerHTML='<div class="summary"><div><strong>'+(!rows.length?'Select at least one requirement':caution?'Resolve the gaps before you go':supported===rows.length?'Published support, with important conditions':'Some details still need an answer')+'</strong><p>Facility-level evidence only. Confirm your exact destination and visit time.</p></div><div class="coverage">'+supported+'<small> / '+rows.length+' supported</small></div></div><div class="journey">'+rows.map(r=>'<div class="node '+r.state+'"><span class="symbol">'+r.icon+'</span><strong>'+esc(r.label)+'</strong><small>'+labels[r.state]+'</small></div>').join('')+'</div><div class="section-title">Your source evidence <span>Every claim has a trail. Every gap stays visible.</span></div>'+rows.map(r=>'<article class="card"><div class="card-top"><span class="card-icon" aria-hidden="true">'+r.icon+'</span><h3>'+esc(r.label)+'</h3><span class="badge '+r.state+'">'+labels[r.state]+'</span></div><div class="card-body">'+(r.records.length?r.records.map(e=>'<p>'+esc(e.summary||'The source contains an explicit '+e.claim+' statement. Open the page to read the full context.')+'</p><div class="quote">“'+esc(e.excerpt)+'”</div><div class="source"><a href="'+esc(current.mode==='fixture'?e.source_url.replace('https://'+location.host,location.origin):e.source_url)+'" target="_blank" rel="noopener noreferrer">'+(current.mode==='fixture'?'Fixture source':'Official source')+' ↗</a><span>Page date: '+esc(e.source_date||'not stated')+'</span></div>').join('<hr style="border:0;border-top:1px solid #e8ecdf;margin:15px 0">'):'<p>No usable published evidence was established for this requirement.</p><p><strong>Ask the venue:</strong> '+esc(r.question)+'</p>')+'</div></article>').join('')+(current.limitations?.length?'<div class="caveats"><h3>Read this before planning your visit</h3><ul>'+current.limitations.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'')+'<div class="actions"><button class="secondary" id="draft">Draft a venue enquiry ↗</button><button class="secondary" id="download">Download evidence JSON ↓</button><button class="secondary" id="print">Print report</button></div><p class="disclaimer">'+(current.mode==='fixture'?'This is a fictional test scenario, not a claim about any real venue. ':'Saved results describe information retrieved on the stated date. ')+'Published support is not an accessibility certification. Requirements may depend on room, dimensions, assistance and current equipment availability.</p>';
+ $('view-evidence').innerHTML='<div class="summary"><div><strong>'+(!rows.length?'Select at least one requirement':caution?'Resolve the gaps before you go':supported===rows.length?'Published support, with important conditions':'Some details still need an answer')+'</strong><p>Facility-level evidence only. Confirm your exact destination and visit time.</p></div><div class="coverage">'+supported+'<small> / '+rows.length+' supported</small></div></div><div class="journey">'+rows.map(r=>'<div class="node '+r.state+'"><span class="symbol">'+r.icon+'</span><strong>'+esc(r.label)+'</strong><small>'+labels[r.state]+'</small></div>').join('')+'</div><div class="section-title">Your source evidence <span>Every claim has a trail. Every gap stays visible.</span></div>'+rows.map(r=>'<article class="card"><div class="card-top"><span class="card-icon" aria-hidden="true">'+r.icon+'</span><h3>'+esc(r.label)+'</h3><span class="badge '+r.state+'">'+labels[r.state]+'</span></div><div class="card-body">'+(r.records.length?r.records.map(e=>'<p>'+esc(e.summary||'The source contains an explicit '+e.claim+' statement. Open the page to read the full context.')+'</p><div class="quote">“'+esc(e.excerpt)+'”</div><div class="source"><a href="'+esc(current.mode==='fixture'?e.source_url.replace('https://'+location.host,location.origin):e.source_url)+'" target="_blank" rel="noopener noreferrer">'+(current.mode==='fixture'?'Fixture source':'Official source')+' ↗</a><span>Page date: '+esc(e.source_date||'not stated')+'</span></div>').join('<hr style="border:0;border-top:1px solid #e8ecdf;margin:15px 0">'):'<p>No usable published evidence was established for this requirement.</p><p><strong>Ask the venue:</strong> '+esc(r.question)+'</p>')+'</div></article>').join('')+(current.limitations?.length?'<div class="caveats"><h3>Read this before planning your visit</h3><ul>'+current.limitations.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul></div>':'')+'<div class="actions"><button class="secondary" id="draft">Draft a venue enquiry ↗</button><button class="secondary" id="download">Download evidence JSON ↓</button><button class="secondary" id="print">Print report</button><button class="secondary" id="share-venue">Share venue ↗</button></div><p class="disclaimer">'+(current.mode==='fixture'?'This is a fictional test scenario, not a claim about any real venue. ':'Saved results describe information retrieved on the stated date. ')+'Mixed evidence may describe different rooms or conditions, rather than a factual disagreement. Published support is not an accessibility certification. Requirements may depend on room, dimensions, assistance and current equipment availability.</p>';
  $('draft')?.addEventListener('click',()=>{$('enquiry-text').value=enquiry(rows,current.venue_name);$('enquiry-dialog').showModal();});
  $('download')?.addEventListener('click',()=>{const b=new Blob([JSON.stringify({...current,selected_requirements:selected(),report:rows},null,2)],{type:'application/json'});const u=URL.createObjectURL(b);const a=document.createElement('a');a.href=u;a.download='accesstrail-'+v.id+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);});
  $('print')?.addEventListener('click',()=>window.print());
+ $('share-venue')?.addEventListener('click',async()=>{const link=location.origin+'/?venue='+venue().id;try{await navigator.clipboard.writeText(link);status('Venue link copied. It opens the latest saved report.');}catch{status('Share this venue: '+link);}});
  const steps=current.mode==='fixture'?[['Controlled inputs','Two fictional pages disagree about restroom access.'],['Conflict reducer','Both claims are retained; a positive cannot cancel a negative.'],['Unresolved question','Ask the venue to clarify the step-free restroom route.']]:[['TinyFish investigation','Official accessibility information researched using TinyAgent / Mako.'],['Evidence extraction','Statements assigned to entrance, lift, restroom, companion and assistance.'],['Conservative review','Short fragments and paraphrases preserve limitations. Facility evidence does not establish a complete destination route.'],['Deterministic report','Uncited or off-domain records are excluded. Missing requirements stay unknown.']];
  $('view-trace').innerHTML='<div class="section-title">Where this report came from</div>'+steps.map(([t,d])=>'<div class="trace-item"><strong>'+esc(t)+'</strong><p>'+esc(d)+'</p></div>').join('')+'<div class="trace-meta"><strong>'+esc(current.provider||'Controlled fixture')+'</strong><br>Run reference: '+esc(current.run_id||'fixture-conflict-01')+'<br>Captured: '+esc(current.checked_at)+'<br>'+esc(current.editorial_note||'Live structured output; verify source context before relying on a claim.')+'</div><p class="disclaimer">Saved report provenance is real; this view explains processing stages and is not a replay of browser steps. Provider run references may require the owner’s TinyFish sign-in.</p>';
 }
-function setView(view){activeView=view;for(const id of ['evidence','trace','changes']){$('view-'+id).classList.toggle('hidden',id!==view);$('tab-'+id).setAttribute('aria-selected',String(id===view));$('tab-'+id).tabIndex=id===view?0:-1;}}
-['evidence','trace','changes'].forEach((id,i,all)=>{$('tab-'+id).onclick=()=>setView(id);$('tab-'+id).onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?2:(i+(e.key==='ArrowRight'?1:2))%3;setView(all[n]);$('tab-'+all[n]).focus();};});
+function setView(view){activeView=view;for(const id of ['evidence','trace','changes','compare']){$('view-'+id).classList.toggle('hidden',id!==view);$('tab-'+id).setAttribute('aria-selected',String(id===view));$('tab-'+id).tabIndex=id===view?0:-1;}}
+['evidence','trace','changes','compare'].forEach((id,i,all)=>{$('tab-'+id).onclick=()=>setView(id);$('tab-'+id).onkeydown=e=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(e.key))return;e.preventDefault();const n=e.key==='Home'?0:e.key==='End'?3:(i+(e.key==='ArrowRight'?1:3))%4;setView(all[n]);$('tab-'+all[n]).focus();};});
 function fixture(){const source='https://'+location.host+'/fixtures/visitor-guide';return {mode:'fixture',venue_name:'Example Gallery — conflict scenario',checked_at:'controlled fixture',provider:'Deterministic test scenario',evidence:[{requirement_id:'entrance',claim:'supports',excerpt:'Step-free entrance available',summary:'The fictional guide lists a step-free entrance.',source_url:source,source_date:null},{requirement_id:'restroom',claim:'supports',excerpt:'Accessible restroom on site',summary:'The fictional main guide says an accessible restroom exists.',source_url:source,source_date:null},{requirement_id:'restroom',claim:'contradicts',excerpt:'Restroom reached by stairs',summary:'A fictional update says the restroom route requires stairs.',source_url:'https://'+location.host+'/fixtures/updates',source_date:null}],limitations:['Fictional scenario for testing conflict handling.','No lift, companion or assistance information is provided.']};}
-function useFixture(){const f=fixture();return f;}
-// Fixture source domains are local and explicitly isolated from real venue reports.
-function showFixture(){current=useFixture();const old=venue().host;const target=VENUES.find(v=>v.id===$('venue').value);target.host=new URL(location.origin).hostname;render();target.host=old;}
-document.querySelectorAll('#requirements input').forEach(e=>e.onchange=()=>{if(current?.mode==='fixture')showFixture();else render();});
-$('venue').onchange=()=>{if(busy)return;lastVenue=$('venue').value;current=lastVenue==='british'?RECORDED:null;$('changes-result').textContent='';status('');$('venue-hint').textContent=current?'One genuine TinyFish run is available to explore. No account needed.':'No saved evidence for this venue. Choose live research to investigate.';$('run-mode').value=current?'saved':'live';$('mode').textContent=current?'Saved TinyFish run · 6 Nov 2026':'Live investigation · your provider credits';$('research').firstElementChild.textContent=current?'Explore evidence':'Run live research';render();};
-$('run-mode').onchange=()=>{const m=$('run-mode').value;$('research').firstElementChild.textContent=m==='live'?'Run live research':m==='fixture'?'Explore conflict demo':'Explore evidence';$('mode').textContent=m==='live'?'Live TinyFish run · your provider credits':m==='fixture'?'Fictional scenario · no API call':'Saved TinyFish run · 6 Nov 2026';};
-function connect(){$('api-key').value='';$('key-dialog').showModal();}
-$('connect').onclick=connect;$('cancel-key').onclick=()=>$('key-dialog').close();$('forget-key').onclick=()=>{key='';$('connect').textContent='Connect TinyFish ↗';$('key-dialog').close();status('TinyFish disconnected.');};
-$('save-key').onclick=()=>{const k=$('api-key').value.trim();if(!/^sk-tinyfish-[A-Za-z0-9_-]{10,200}$/.test(k)){status('Enter a valid TinyFish key.',true);return;}key=k;$('api-key').value='';$('key-dialog').close();$('connect').textContent='TinyFish connected ✓';status('Key connected for this tab only. Live research uses your provider credits.');};
-$('research').onclick=async()=>{
+function showFixture(){current=fixture();render();}
+function renderComparison(){
+ const list=$('compare-cards');if(!list)return;
+ list.innerHTML=catalog.map(v=>{const c=v.report?compareRequirements(v.report,selected(),v.host):null;return '<article class="compare-card"><div class="step-label">'+esc(v.city)+'</div><h3>'+esc(v.name)+'</h3><p>'+(c?c.supported+' requirements have published support · '+c.attention+' include restrictions or mixed evidence · '+c.unknown+' unknown.':'No completed report. Requirements remain unknown.')+'</p><small>'+(v.report?'Captured '+esc(v.report.checked_at):'Awaiting investigation')+'</small><button class="secondary" data-open-venue="'+v.id+'">Open venue ↗</button></article>';}).join('');
+ list.querySelectorAll('[data-open-venue]').forEach(b=>b.onclick=()=>{if(busy)return;$('venue').value=b.dataset.openVenue;chooseVenue();setView('evidence');});
+}
+function chooseVenue(){
+ if(busy)return;
+ current=catalog.find(v=>v.id===venue().id)?.report||null;
+ if(current&&current.mode!=='recorded')current={...current,mode:'cached'};
+ $('changes-result').textContent='';status('');
+ $('venue-hint').textContent=current?'A genuine TinyFish report is available. You can inspect it or check for a newer result.':'No saved report yet. Live research is available without a key.';
+ $('run-mode').value=current?'saved':'live';updateMode();render();
+ history.replaceState(null,'','?venue='+venue().id);
+}
+function updateMode(){const m=$('run-mode').value;$('research').firstElementChild.textContent=m==='live'?'Check venue with TinyFish':m==='fixture'?'Explore conflict demo':'Explore latest evidence';$('mode').textContent=m==='live'?'No key needed · shared runs are limited':m==='fixture'?'Fictional scenario · no API call':'Latest completed report · source date shown';}
+document.querySelectorAll('#requirements input').forEach(e=>e.onchange=()=>{render();renderComparison();});
+for(const id of ['venue','run-mode'])$(id).onchange=id==='venue'?chooseVenue:updateMode;
+$('connect').onclick=()=>$('about-dialog').showModal();$('close-about').onclick=()=>$('about-dialog').close();
+async function loadCatalog(){try{const res=await fetch('/api/catalog');const data=await res.json();if(res.ok&&Array.isArray(data.venues))catalog=data.venues;renderComparison();}catch{}}
+function completedReport(result,cached=false){
+ const parsed=parseResult({result});if(!parsed)throw Error('The research result did not contain usable evidence.');
+ current={...parsed,mode:cached?'cached':'live'};const entry=catalog.find(v=>v.id===venue().id);if(entry)entry.report=current;
+ render();renderComparison();setView('evidence');sessionStorage.removeItem('accesstrail-run-'+venue().id);
+ status(cached?'Recent saved research loaded. No additional paid run was started.':'Live research complete. The report is saved for future visitors.');
+}
+async function investigate(resumeId=null){
  if(busy)return;if(!selected().length){status('Select at least one requirement.',true);return;}
  const m=$('run-mode').value;
- if(m==='fixture'){showFixture();setView('evidence');status('Controlled fixture loaded. This is not a real venue.');return;}
- if(m==='saved'){current=venue().id==='british'?RECORDED:null;render();setView('evidence');status(current?'Saved genuine TinyFish evidence loaded. No new run was started.':'No saved run is available. Select live research.',!current);return;}
- if(!key){connect();status('Connect your TinyFish key, then click Run live research.');return;}
- busy=true;$('research').disabled=true;$('venue').disabled=true;$('run-mode').disabled=true;$('research').lastElementChild.innerHTML='<span class="spinner" aria-hidden="true"></span>';status('Starting TinyFish. This may take a few minutes…');
- let runId='';const started=Date.now();
+ if(!resumeId&&m==='fixture'){showFixture();setView('evidence');status('Controlled fixture loaded. This is not a real venue.');return;}
+ if(!resumeId&&m==='saved'){await loadCatalog();current=catalog.find(v=>v.id===venue().id)?.report||null;if(current&&current.mode!=='recorded')current={...current,mode:'cached'};render();setView('evidence');status(current?'Latest saved research loaded. No new run was started.':'No saved run yet. Select Live research.',!current);return;}
+ busy=true;$('research').disabled=true;$('venue').disabled=true;$('run-mode').disabled=true;$('research').lastElementChild.innerHTML='<span class="spinner" aria-hidden="true"></span>';
+ $('run-progress').classList.remove('hidden');status(resumeId?'Resuming your venue investigation…':'Starting TinyFish. This may take a few minutes…');
+ let runId=resumeId||'';const started=Date.now();
  try{
-  const headers={'Content-Type':'application/json','X-Tinyfish-Key':key};
-  const res=await fetch('/api/research',{method:'POST',headers,body:JSON.stringify({venue:venue().id})});
-  const start=await res.json();if(!res.ok)throw Error(start.error||'Run could not start');
-  runId=start.run_id;status('TinyFish investigation started. Run '+runId+'\nChecking progress in the background…');
+  const headers={'Content-Type':'application/json'};
+  if(!runId){const res=await fetch('/api/research',{method:'POST',headers,body:JSON.stringify({venue:venue().id})});const start=await res.json();if(!res.ok)throw Error(start.error||'Run could not start');if(start.status==='COMPLETED'&&start.result){completedReport(start.result,true);return;}runId=start.run_id;sessionStorage.setItem('accesstrail-run-'+venue().id,JSON.stringify({id:runId,at:Date.now()}));}
   let completed=false;
   for(let attempt=0;attempt<120;attempt++){
    await new Promise(resolve=>setTimeout(resolve,3000));
-   const poll=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify({venue:venue().id,run_id:runId})});
-   const e=await poll.json();if(!poll.ok)throw Error(e.error||'Could not check the research run.');
-   if(['FAILED','CANCELLED','TIMED_OUT'].includes(e.status))throw Error('TinyFish finished without a completed result ('+e.status+'). Run '+runId);
-   if(e.status==='COMPLETED'){
-    const result=parseResult(e);if(!result)throw Error('TinyFish returned an incomplete evidence schema. Run '+runId);
-    current={...result,mode:'live',provider:'TinyFish TinyAgent',run_id:runId,checked_at:new Date().toISOString(),duration_seconds:Math.round((Date.now()-started)/1000)};completed=true;render();setView('evidence');status('Live research complete. Inspect the source context and limitations.');break;
-   }
-   status('TinyFish: '+(e.status||'RUNNING')+' · '+Math.round((Date.now()-started)/1000)+' seconds\nRun '+runId);
+   let e;try{const poll=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify({venue:venue().id,run_id:runId})});e=await poll.json();if(!poll.ok)throw Error(e.error||'Could not check this run.');}catch(error){if(attempt%5!==4){status('Reconnecting to your investigation…');continue;}throw error;}
+   if(['FAILED','CANCELLED','TIMED_OUT'].includes(e.status)){sessionStorage.removeItem('accesstrail-run-'+venue().id);throw Error(e.error||'The investigation did not complete. Your previous report is unchanged.');}
+   if(e.status==='COMPLETED'){completedReport(e.result);completed=true;break;}
+   status((e.status==='STARTING'||e.status==='PENDING'?'Preparing research':'Researching official venue information')+' · '+Math.round((Date.now()-started)/1000)+' seconds. You can reload this page to resume.');
   }
-  if(!completed)throw Error('This investigation is taking longer than expected. Run '+runId+' may still be active in your TinyFish dashboard. Your previous report is unchanged.');
- }catch(e){status(e.message+(runId?'\nRun reference: '+runId:''),true);}finally{busy=false;$('research').disabled=false;$('venue').disabled=false;$('run-mode').disabled=false;$('research').lastElementChild.textContent='↗';}
+  if(!completed)throw Error('This investigation is taking longer than expected. Reload this page to check again. Your previous report is unchanged.');
+ }catch(e){status(e.message,true);}finally{busy=false;$('research').disabled=false;$('venue').disabled=false;$('run-mode').disabled=false;$('research').lastElementChild.textContent='↗';$('run-progress').classList.add('hidden');}
+}
+$('research').onclick=()=>investigate();
+$('refresh').onclick=async()=>{
+ if(current?.mode==='fixture'){$('changes-result').textContent='This is a controlled fixture. Source checks apply to real venue reports.';return;}
+ const b=$('refresh');b.disabled=true;$('changes-result').textContent='TinyFish is checking the report’s official sources…';
+ try{const res=await fetch('/api/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({venue:venue().id})});const d=await res.json();if(!res.ok)throw Error(d.error);$('changes-result').innerHTML='<p><strong>'+(d.cached?'Recent source check':'Source check completed')+'</strong> · '+esc(d.checked_at)+'</p>'+d.checks.map(c=>'<div class="marker-row"><span>'+esc(REQUIREMENTS.find(r=>r.id===c.requirement_id)?.label||c.requirement_id)+'</span><strong class="marker-'+c.state+'">'+({found:'Text found',not_found:'Review wording',retrieval_failed:'Could not retrieve'}[c.state]||'Unknown')+'</strong></div>').join('')+'<p>'+esc(d.previous_checked_at?'Compared with the source check at '+d.previous_checked_at+'. '+d.changes.length+' marker changes need review.':'This is the first source check recorded for this venue.')+'</p><p>'+esc(d.notice)+'</p>';}
+ catch(e){$('changes-result').textContent=e.message;}finally{b.disabled=false;}
 };
-$('refresh').onclick=async()=>{if(current?.mode==='fixture'){$('changes-result').textContent='This is a controlled fixture. Live source checks apply to real venues.';return;}const b=$('refresh');b.disabled=true;$('changes-result').textContent='TinyFetch is retrieving the official source…';try{const r=await fetch('/api/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({venue:venue().id})});const d=await r.json();if(!r.ok)throw Error(d.error);$('changes-result').textContent='Checked '+d.checked_at+'\n'+(d.checks.length?d.checks.map(c=>REQUIREMENTS.find(r=>r.id===c.requirement_id).label+': '+(c.found?'marker found':'marker not found — review source')).join('\n'):'Page retrieved. No saved markers exist for this venue.')+'\n\n'+d.notice;}catch(e){$('changes-result').textContent=e.message;}finally{b.disabled=false;}};
+async function initialize(){
+ const requested=new URL(location.href).searchParams.get('venue');if(VENUES.some(v=>v.id===requested))$('venue').value=requested;
+ await loadCatalog();chooseVenue();renderComparison();
+ let saved;try{saved=JSON.parse(sessionStorage.getItem('accesstrail-run-'+venue().id)||'null');}catch{}
+ if(saved?.id&&Date.now()-saved.at<1200000){$('run-mode').value='live';updateMode();investigate(saved.id);}
+}
 $('close-enquiry').onclick=()=>$('enquiry-dialog').close();$('copy-enquiry').onclick=async()=>{try{await navigator.clipboard.writeText($('enquiry-text').value);$('copy-enquiry').textContent='Copied ✓';}catch{$('enquiry-text').select();$('copy-enquiry').textContent='Select and copy text';}};
-render();
+render();initialize();
