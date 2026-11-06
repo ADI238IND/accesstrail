@@ -63,6 +63,16 @@ The target set is intentionally small: British Museum, Smithsonian American Art 
 
 A completed result is normalized before persistence. Invalid or off-domain citations are rejected, evidence is deduplicated and explicit restrictions are kept before display limits are applied. Missing source dates stay unstated. Additional conservative wording checks prevent ticket policies from establishing step-free entry and training commitments from establishing personal assistance. Support for a particular visitor group is labelled conditional. Source checks flag unconfirmed excerpts for review, including when other excerpts in the same requirement match. These rules are heuristics, not a validated accuracy benchmark; they can leave usable facilities unknown. Source context must still be reviewed.
 
+## Vercel hosting
+
+The Vercel deployment target serves the application from `public/` and uses a small Node.js gateway for the five research API operations. The existing Cloudflare Worker remains the research backend and keeps the D1 database, saved reports, shared run allowance and TinyFish secret. No provider credentials are copied into Vercel or the browser.
+
+```sh
+npm run build:vercel
+```
+
+`vercel.json` defines the static output, API rewrites, fixture routes, security headers and gateway timeout. `api/gateway.js` forwards only the fixed allowlisted operations to the research backend. It validates same-origin browser requests, strips visitor credentials and preserves quota errors. It cannot proxy arbitrary URLs. The current live link above remains active until a Vercel production deployment is verified.
+
 ## Run locally
 
 Requires **Node.js 22.13 or newer**. The application runtime has no third-party dependencies. SQLite is provided by Node for local preview and tests.
@@ -93,7 +103,7 @@ npm run validate
 
 ## Validation
 
-The current suite contains **34 checks**, covering evidence states, malformed input, official-domain filtering, durable quotas, concurrent reservation, cache reuse, server-only credentials, unrelated run isolation, persistence, source-check failure handling and quote limits. GitHub Actions runs tests, build and artifact validation on pushes.
+The current suite contains **40 checks**, covering evidence states, malformed input, official-domain filtering, durable quotas, concurrent reservation, cache reuse, server-only credentials, unrelated run isolation, persistence, source-check failure handling and quote limits. GitHub Actions runs tests, build and artifact validation on pushes.
 
 Browser QA covers the report, comparison navigation, enquiry draft, fixture and the production research flow. No statistical extraction-accuracy claim is made from these software tests.
 

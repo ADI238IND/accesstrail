@@ -4,4 +4,6 @@ site.tar.gz
 .env.*
 !.env.example
 node_modules/
+.vercel/
+public/
 .openai/local*

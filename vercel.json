@@ -1,0 +1,23 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "node scripts/build-vercel.mjs",
+  "outputDirectory": "public",
+  "framework": null,
+  "functions": {"api/gateway.js": {"maxDuration": 120}},
+  "rewrites": [
+    {"source":"/api/health","destination":"/api/gateway?route=health"},
+    {"source":"/api/catalog","destination":"/api/gateway?route=catalog"},
+    {"source":"/api/research","destination":"/api/gateway?route=research"},
+    {"source":"/api/run","destination":"/api/gateway?route=run"},
+    {"source":"/api/refresh","destination":"/api/gateway?route=refresh"},
+    {"source":"/fixtures/visitor-guide","destination":"/fixtures/visitor-guide.txt"},
+    {"source":"/fixtures/updates","destination":"/fixtures/updates.txt"}
+  ],
+  "headers": [{"source":"/(.*)","headers":[
+    {"key":"X-Content-Type-Options","value":"nosniff"},
+    {"key":"X-Frame-Options","value":"DENY"},
+    {"key":"Referrer-Policy","value":"no-referrer"},
+    {"key":"Permissions-Policy","value":"camera=(), microphone=(), geolocation=()"},
+    {"key":"Content-Security-Policy","value":"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"}
+  ]}]
+}

@@ -1,0 +1,11 @@
+import {mkdir,writeFile} from 'node:fs/promises';
+import {execFileSync} from 'node:child_process';
+execFileSync(process.execPath,['scripts/assemble.mjs'],{stdio:'inherit'});
+const {default:worker}=await import('../worker/index.js');
+const response=await worker.fetch(new Request('https://build.accesstrail.local/'),{},{});
+if(!response.ok)throw Error('Could not build the public application');
+await mkdir('public/fixtures',{recursive:true});
+await writeFile('public/index.html',await response.text());
+await writeFile('public/fixtures/visitor-guide.txt','Fictional AccessTrail test source. This example gallery describes a step-free entrance and an accessible restroom. It is not a real venue.');
+await writeFile('public/fixtures/updates.txt','Fictional AccessTrail update. The example restroom is reached by stairs. It is not a real venue.');
+console.log('Built Vercel frontend; the research service and persistent reports are preserved.');
