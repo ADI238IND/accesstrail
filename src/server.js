@@ -8,7 +8,7 @@ const pending=['STARTING','PENDING','RUNNING','QUEUED'];
 const CACHE_MS=86400000;
 export const SHARED_RUN_LIMIT=4;
 async function latestReport(db,venue){
- if(db){const row=await db.prepare('SELECT result_json FROM research_jobs WHERE venue = ? AND status = ? ORDER BY updated_at DESC LIMIT 1').bind(venue.id,'COMPLETED').first();if(row?.result_json){try{return JSON.parse(row.result_json);}catch{}}}
+ if(db){const row=await db.prepare('SELECT result_json FROM research_jobs WHERE venue = ? AND status = ? ORDER BY updated_at DESC LIMIT 1').bind(venue.id,'COMPLETED').first();if(row?.result_json){try{const data=JSON.parse(row.result_json);return normalizeReport(data,venue,data.run_id,data.checked_at);}catch{}}}
  return recorded.id===venue.id?recorded:null;
 }
 export async function reserveRun(db,venue,now=Date.now()){
@@ -28,7 +28,7 @@ async function startShared(env,venue){
  if(!env.DB||!env.TINYFISH_API_KEY)return json({error:'Live research is temporarily unavailable. Saved evidence is still available.'},503);
  const reservation=await reserveRun(env.DB,venue);
  if(reservation.quota_exhausted)return json({error:'Shared live refreshes have reached their limit. You can still explore saved evidence and check its sources.'},429);
- if(!reservation.reserved)return json(reservation);
+ if(!reservation.reserved){if(reservation.result)reservation.result=normalizeReport(reservation.result,venue,reservation.result.run_id,reservation.result.checked_at);return json(reservation);}
  try{
   const res=await fetch('https://agent.tinyfish.ai/v1/automation/run-async',{method:'POST',headers:{'X-API-Key':env.TINYFISH_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({url:venue.url,goal:createGoal(venue),api_integration:'accesstrail'}),signal:AbortSignal.timeout(25000)});
   if(!res.ok)throw Error('TinyFish did not accept this investigation (HTTP '+res.status+').');
@@ -41,7 +41,7 @@ async function checkShared(env,venue,id){
  if(!env.DB||!env.TINYFISH_API_KEY)return json({error:'Live research is temporarily unavailable.'},503);
  const row=await env.DB.prepare('SELECT * FROM research_jobs WHERE id = ? AND venue = ?').bind(id,venue.id).first();
  if(!row)return json({error:'This report run was not created by AccessTrail.'},404);
- if(row.status==='COMPLETED')return json({run_id:id,status:'COMPLETED',result:JSON.parse(row.result_json)});
+ if(row.status==='COMPLETED'){const data=JSON.parse(row.result_json);return json({run_id:id,status:'COMPLETED',result:normalizeReport(data,venue,data.run_id,data.checked_at)});}
  if(!pending.includes(row.status))return json({run_id:id,status:row.status,error:row.error||'This investigation did not complete.'});
  if(!row.provider_run_id||Date.now()-row.updated_at<2500)return json({run_id:id,status:row.status});
  try{
@@ -52,6 +52,7 @@ async function checkShared(env,venue,id){
   if(status==='COMPLETED'){report=normalizeReport(d.resultJson??d.result,venue,row.provider_run_id);if(!report){await env.DB.prepare('UPDATE research_jobs SET status = ?,error = ?,updated_at = ? WHERE id = ?').bind('FAILED','TinyFish returned an invalid evidence report.',Date.now(),id).run();return json({run_id:id,status:'FAILED',error:'TinyFish returned an invalid evidence report.'});}}
   const message=['FAILED','CANCELLED'].includes(status)?'TinyFish could not complete the investigation. No report has been substituted.':null;
   await env.DB.prepare('UPDATE research_jobs SET status = ?,result_json = ?,error = ?,updated_at = ? WHERE id = ?').bind(status,report?JSON.stringify(report):null,message,Date.now(),id).run();
+  if(status==='COMPLETED'){await refreshSources(env,venue);report=await latestReport(env.DB,venue);}
   return json({run_id:id,status,result:report,error:message});
  }catch{return json({run_id:id,status:row.status,retryable:true});}
 }
@@ -59,17 +60,18 @@ const normalizedText=s=>s.toLowerCase().replace(/[\u2010-\u2015]/g,'-').replace(
 async function refreshSources(env,venue){
  if(!env.TINYFISH_API_KEY)return json({error:'Source checking is temporarily unavailable.'},503);
  const prior=env.DB?await env.DB.prepare('SELECT * FROM source_checks WHERE venue = ?').bind(venue.id).first():null;
- if(prior&&Date.now()-prior.checked_at<300000)return json({...JSON.parse(prior.result_json),cached:true});
  const report=await latestReport(env.DB,venue);if(!report)return json({error:'Complete a venue investigation first so there are evidence markers to verify.'},409);
+ if(prior&&Date.now()-prior.checked_at<300000){const cached=JSON.parse(prior.result_json);if(cached.report_run_id===report.run_id)return json({...cached,cached:true});}
  const evidence=report.evidence.filter(e=>safeSource(e.source_url,venue.host));
  const urls=[...new Set(evidence.map(e=>e.source_url))].slice(0,3),checks=[];
- for(const url of urls){
+ await Promise.all(urls.map(async url=>{
   let text='',failure=false;
   try{const res=await fetch('https://api.fetch.tinyfish.ai',{method:'POST',headers:{'X-API-Key':env.TINYFISH_API_KEY,'Content-Type':'application/json'},body:JSON.stringify({urls:[url]}),signal:AbortSignal.timeout(30000)});const data=res.ok?await res.json():null;text=normalizedText(JSON.stringify(data));failure=!data||data.error||data.success===false||text.length<250||/just a moment|verify you are human|access denied|cf-chl-/.test(text);}catch{failure=true;}
   for(const e of evidence.filter(e=>e.source_url===url))checks.push({requirement_id:e.requirement_id,source_url:url,marker:e.excerpt,state:failure?'retrieval_failed':text.includes(normalizedText(e.excerpt))?'found':'not_found'});
- }
+ }));
  let previous=[];try{previous=prior?JSON.parse(prior.result_json).checks:[];}catch{}
- const result={checked_at:new Date().toISOString(),provider:'TinyFish TinyFetch',checks,previous_checked_at:prior?new Date(prior.checked_at).toISOString():null,changes:checks.filter(c=>c.state!=='retrieval_failed'&&previous.some(p=>p.source_url===c.source_url&&p.marker===c.marker&&p.state!==c.state&&p.state!=='retrieval_failed')),notice:'These are short text-marker checks, not a physical inspection. Missing text may reflect wording changes. Retrieval failures never establish that information or facilities were removed.'};
+ const result={report_run_id:report.run_id,checked_at:new Date().toISOString(),provider:'TinyFish TinyFetch',checks,previous_checked_at:prior?new Date(prior.checked_at).toISOString():null,changes:checks.filter(c=>c.state!=='retrieval_failed'&&previous.some(p=>p.source_url===c.source_url&&p.marker===c.marker&&p.state!==c.state&&p.state!=='retrieval_failed')),notice:'These are short text-marker checks, not a physical inspection. Missing text may reflect wording changes. Retrieval failures never establish that information or facilities were removed.'};
+ if(env.DB){const job=await env.DB.prepare('SELECT id,result_json FROM research_jobs WHERE venue = ? AND status = ? ORDER BY updated_at DESC LIMIT 1').bind(venue.id,'COMPLETED').first();if(job?.result_json){const saved=JSON.parse(job.result_json);saved.evidence=saved.evidence.map(e=>{const checked=checks.find(c=>c.source_url===e.source_url&&c.marker===e.excerpt);return checked?{...e,verification:checked.state}:e;});await env.DB.prepare('UPDATE research_jobs SET result_json = ? WHERE id = ?').bind(JSON.stringify(saved),job.id).run();}}
  if(env.DB)await env.DB.prepare('INSERT INTO source_checks (venue,checked_at,result_json) VALUES (?,?,?) ON CONFLICT(venue) DO UPDATE SET checked_at=excluded.checked_at,result_json=excluded.result_json').bind(venue.id,Date.now(),JSON.stringify(result)).run();
  return json(result);
 }

@@ -18,8 +18,11 @@ export function reduceReport(data,selected=REQUIREMENTS.map(r=>r.id),host='briti
  return REQUIREMENTS.filter(r=>selected.includes(r.id)).map(r=>{
   const seen=new Set();
   const records=evidence.filter(e=>e&&e.requirement_id===r.id&&['supports','contradicts'].includes(e.claim)&&typeof e.excerpt==='string'&&e.excerpt.trim()&&safeSource(e.source_url,host)).filter(e=>{const k=e.claim+'|'+e.source_url+'|'+e.excerpt;if(seen.has(k))return false;seen.add(k);return true;});
-  const positive=records.some(e=>e.claim==='supports'),negative=records.some(e=>e.claim==='contradicts');
-  let state=positive&&negative?'conflict':negative?'contradicted':positive?'supported':'unknown';
+  const usable=records.filter(e=>!['not_found','retrieval_failed'].includes(e.verification));
+  const positive=usable.some(e=>e.claim==='supports'),negative=usable.some(e=>e.claim==='contradicts');
+  const conditional=usable.some(e=>e.claim==='supports'&&e.conditional);
+  let state=positive&&negative?'conflict':negative?'contradicted':conditional?'conditional':positive?'supported':'unknown';
+  if(records.some(e=>['not_found','retrieval_failed'].includes(e.verification)))state='unknown';
   if(!records.length&&data?.retrieval_failed)state='failed';
   return {...r,state,records};
  });
@@ -36,24 +39,38 @@ export function parseResult(event) {
 }
 export function normalizeReport(input,venue,runId,checkedAt=new Date().toISOString()) {
  const d=parseResult({result:input});if(!d)return null;
- const candidates=d.evidence.filter(e=>e&&REQUIREMENTS.some(r=>r.id===e.requirement_id)&&['supports','contradicts'].includes(e.claim)&&typeof e.excerpt==='string'&&e.excerpt.trim()&&safeSource(e.source_url,venue.host));
+ const gaps=Array.isArray(d.gaps)?d.gaps.filter(g=>g&&typeof g.requirement_id==='string'&&typeof g.reason==='string'):[];
+ const candidates=d.evidence.filter(e=>{
+  if(!e||!REQUIREMENTS.some(r=>r.id===e.requirement_id)||!['supports','contradicts'].includes(e.claim)||typeof e.excerpt!=='string'||!e.excerpt.trim()||!safeSource(e.source_url,venue.host))return false;
+  if(e.claim==='supports'){
+   const text=(e.summary||'')+' '+e.excerpt;
+   let reason='';
+   if(e.requirement_id==='entrance'&&!/step[ -]?free|stepless|level (access|route|entrance)|ramp|accessible entrance|entrance.{0,25}accessible|barrier[ -]?free/i.test(text))reason='An entry or ticket policy does not establish a step-free entrance. Confirm the physical route with the venue.';
+   if(e.requirement_id==='assistance'&&/train|sensiti[sz]|commitment|committed/i.test(text)&&!/available|can (arrange|book|request)|on request|provided on|offers? (guided|personal|staff)/i.test(text))reason='Staff training or a commitment to inclusion does not establish that personal assistance is available for your visit.';
+   if(reason){if(!gaps.some(g=>g.requirement_id===e.requirement_id&&g.reason===reason))gaps.push({requirement_id:e.requirement_id,reason});return false;}
+  }
+  return true;
+ });
  // Keep explicit restrictions before general positives when applying display limits.
  candidates.sort((a,b)=>Number(b.claim==='contradicts')-Number(a.claim==='contradicts'));
+ const representatives=REQUIREMENTS.map(r=>candidates.find(e=>e.requirement_id===r.id)).filter(Boolean);
+ const ordered=[...representatives,...candidates.filter(e=>!representatives.includes(e))];
  const perSource=new Map(),seen=new Set(),evidence=[];
- for(const e of candidates){
+ for(const e of ordered){
   const url=new URL(e.source_url);url.hash='';const source_url=url.href;
   const excerpt=e.excerpt.trim().split(/\s+/).slice(0,3).join(' ');
   const signature=e.requirement_id+'|'+e.claim+'|'+source_url+'|'+excerpt;
   if(seen.has(signature)||(perSource.get(source_url)||0)>=8)continue;
   seen.add(signature);perSource.set(source_url,(perSource.get(source_url)||0)+1);
-  evidence.push({requirement_id:e.requirement_id,claim:e.claim,excerpt,summary:typeof e.summary==='string'?e.summary.slice(0,700):'',source_url,source_date:typeof e.source_date==='string'?e.source_date.slice(0,80):null});
+  const conditional=!!e.conditional||(e.claim==='supports'&&['companion','assistance'].includes(e.requirement_id)&&/visually impaired|blind|low vision|tactile|deaf|hearing impaired/i.test(e.summary||''));
+  evidence.push({requirement_id:e.requirement_id,claim:e.claim,excerpt,summary:typeof e.summary==='string'?e.summary.slice(0,700):'',source_url,source_date:typeof e.source_date==='string'?e.source_date.slice(0,80):null,conditional,...(['found','not_found','retrieval_failed'].includes(e.verification)?{verification:e.verification}:{})});
   if(evidence.length>=20)break;
  }
- return {id:venue.id,venue_name:venue.name,official_url:venue.url,checked_at:checkedAt,mode:'live',provider:'TinyFish TinyAgent',run_id:runId,evidence,limitations:d.limitations.slice(0,12).map(s=>s.slice(0,500)),editorial_note:'TinyFish output is validated for schema and official source domains. Opposing labels may describe different areas or conditions rather than a factual contradiction. Read the source context.'};
+ return {id:venue.id,venue_name:venue.name,official_url:venue.url,checked_at:checkedAt,mode:'live',provider:'TinyFish TinyAgent',run_id:runId,evidence,gaps,limitations:d.limitations.slice(0,12).map(s=>s.slice(0,500)),editorial_note:'TinyFish output is checked for schema, official source domains and minimum criterion wording. Group-specific support is conditional. These conservative checks are not a validated extraction-accuracy benchmark or a physical inspection.'};
 }
 export function compareRequirements(report,selected,host){
  const rows=reduceReport(report,selected,host);
- return {supported:rows.filter(r=>r.state==='supported').length,attention:rows.filter(r=>['conflict','contradicted'].includes(r.state)).length,unknown:rows.filter(r=>['unknown','failed'].includes(r.state)).length,rows};
+ return {supported:rows.filter(r=>r.state==='supported').length,attention:rows.filter(r=>['conflict','contradicted','conditional'].includes(r.state)).length,unknown:rows.filter(r=>['unknown','failed'].includes(r.state)).length,rows};
 }
 export function enquiry(rows,venue) {
  const unresolved=rows.filter(r=>r.state!=='supported');

@@ -32,13 +32,21 @@ AccessTrail preserves that context instead of issuing a universal accessible/not
 - The shipped British Museum example comes from genuine TinyFish run `edbf3e91-fa6e-4683-b2b8-f5fb3b4396e3`, captured 6 November 2026. Its output was shortened and conservatively paraphrased. Provider dashboard references may require the owner's sign-in.
 - A previous deployed-app end-to-end run completed under reference `5a5d80ef-76b3-4004-9b8c-41a9d842772c`. The final shared-key implementation is also tested through the deployed application before submission.
 
+### Completed shared investigations
+
+| Venue | TinyFish run reference |
+| --- | --- |
+| British Museum | `1b0d75f1-d516-46bc-9cbf-2e7a5debdcd0` |
+| National Museum New Delhi | `6e6afcd2-8edb-41ab-b12e-e69257434157` |
+| Smithsonian American Art Museum | `af5247d8-8b86-4761-a76a-b731e221d5bd` |
+
 ## Persistence and shared allowance
 
-Cloudflare D1 stores application jobs, completed public venue reports and source-check history. Concurrent requests reserve work atomically, so an active investigation is shared rather than duplicated. Results under 24 hours old are reused. Source checks are cached for five minutes.
+Cloudflare D1 stores application jobs, completed public venue reports and source-check history. Concurrent requests reserve work atomically, so an active investigation is shared rather than duplicated. Results under 24 hours old are reused. Source checks are cached for five minutes per report. A newly completed investigation automatically checks its cited excerpts before returning the report.
 
 The hackathon demo has **four sponsored research attempts in total**, enforced in the database across deployments. Failed or uncertain starts consume an attempt; the app never silently retries a paid start. This is a run-count limit, not a promise of a fixed dollar cost. Saved reports and recent source checks remain usable when the allowance is exhausted. An operator can deliberately change the allowance in source after assessing provider credits; deployments do not reset usage.
 
-The target set is intentionally small: British Museum, Smithsonian American Art Museum and National Museum in New Delhi. An investigation that cannot retrieve usable evidence stays incomplete or unknown. The app does not claim that all three venues have successful reports until those runs actually complete.
+The target set is intentionally small: British Museum, Smithsonian American Art Museum and National Museum in New Delhi. Genuine investigations for all three venues completed on 6 November 2026 and are saved in production. Completion does not mean every requirement has support: gaps and unconfirmed excerpts remain unknown.
 
 ## Architecture
 
@@ -53,7 +61,7 @@ The target set is intentionally small: British Museum, Smithsonian American Art 
 | `evidence/british-museum.json` | Genuine initial example with provenance |
 | `tests/` | Core logic, real SQLite database behavior and mocked provider integration tests |
 
-A completed result is normalized before persistence. Invalid or off-domain citations are rejected, evidence is deduplicated and explicit restrictions are kept before display limits are applied. Missing source dates stay unstated. Schema checks do not establish that an agent's interpretation is correct; source context must still be reviewed.
+A completed result is normalized before persistence. Invalid or off-domain citations are rejected, evidence is deduplicated and explicit restrictions are kept before display limits are applied. Missing source dates stay unstated. Additional conservative wording checks prevent ticket policies from establishing step-free entry and training commitments from establishing personal assistance. Support for a particular visitor group is labelled conditional. Source checks flag unconfirmed excerpts for review, including when other excerpts in the same requirement match. These rules are heuristics, not a validated accuracy benchmark; they can leave usable facilities unknown. Source context must still be reviewed.
 
 ## Run locally
 
@@ -85,7 +93,7 @@ npm run validate
 
 ## Validation
 
-The current suite contains **27 checks**, covering evidence states, malformed input, official-domain filtering, durable quotas, concurrent reservation, cache reuse, server-only credentials, unrelated run isolation, persistence, source-check failure handling and quote limits. GitHub Actions runs tests, build and artifact validation on pushes.
+The current suite contains **34 checks**, covering evidence states, malformed input, official-domain filtering, durable quotas, concurrent reservation, cache reuse, server-only credentials, unrelated run isolation, persistence, source-check failure handling and quote limits. GitHub Actions runs tests, build and artifact validation on pushes.
 
 Browser QA covers the report, comparison navigation, enquiry draft, fixture and the production research flow. No statistical extraction-accuracy claim is made from these software tests.
 
