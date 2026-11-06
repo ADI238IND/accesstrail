@@ -6,7 +6,7 @@ Built by **Aditya Singhal** for **Tiny Hacks 2026**. Created with AI assistance.
 
 ## Try it
 
-The deployed app link will be added after publication. The default British Museum report is based on a genuine completed TinyFish TinyAgent / Mako run on 6 November 2026. It requires no account or API key to inspect.
+**[Open the live app](https://accesstrail.adityasinghal074.chatgpt.site)**. The default British Museum report is based on a genuine completed TinyFish TinyAgent / Mako run on 6 November 2026. It requires no account or API key to inspect.
 
 1. Select your access requirements and explore the evidence cards.
 2. Open **Run provenance** to inspect the provider run reference.

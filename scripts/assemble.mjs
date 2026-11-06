@@ -1,4 +1,4 @@
-import {readFile,writeFile} from 'node:fs/promises';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
 const core=await readFile('src/core.js','utf8');
 const recorded=await readFile('evidence/british-museum.json','utf8');
 const client=await readFile('src/client.js','utf8');
@@ -7,5 +7,6 @@ let page=await readFile('src/page.html','utf8');
 page=page.replace("@import url('');",'').replace('/*CLIENT*/',stripped+'\nconst RECORDED='+recorded+';\n'+client).replace('</script>','</script>');
 const server=await readFile('src/server.js','utf8');
 const source=core+'\nconst recorded='+recorded+';\n'+server+'\nconst page='+JSON.stringify(page)+';\nexport default {async fetch(request,env,ctx){ const p=new URL(request.url).pathname;if(p.startsWith("/api/"))return api(request,env);if(p.startsWith("/fixtures/"))return new Response("Fictional AccessTrail test source. visitor-guide: accessible restroom on site. updates: restroom reached by stairs. Not a real venue.",{headers:{...securityHeaders,"Content-Type":"text/plain;charset=utf-8"}});if(p!=="/")return new Response("Not found",{status:404});return new Response(page,{headers:{...securityHeaders,"Content-Type":"text/html;charset=utf-8"}});}};\n';
+await mkdir('worker',{recursive:true});
 await writeFile('worker/index.js',source);
 console.log('Assembled application from reviewed source');
