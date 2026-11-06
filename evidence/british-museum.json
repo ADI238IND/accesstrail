@@ -1,0 +1,61 @@
+{
+  "evidence": [
+    {
+      "claim": "supports",
+      "excerpt": "A step-free, easy access",
+      "source_url": "https://www.britishmuseum.org/visit/accessibility-museum",
+      "source_date": null,
+      "requirement_id": "entrance",
+      "summary": "Step-free entry is described at Great Russell Street using entrance lifts and at Montague Place."
+    },
+    {
+      "claim": "supports",
+      "excerpt": "Most lifts in the",
+      "source_url": "https://www.britishmuseum.org/visit/accessibility-museum",
+      "source_date": null,
+      "requirement_id": "lift",
+      "summary": "Several lifts serve the building, but the run also found galleries without level or lift access. Confirm your exact gallery."
+    },
+    {
+      "claim": "supports",
+      "excerpt": "Accessible toilets available",
+      "source_url": "https://www.britishmuseum.org/visit/accessibility-museum",
+      "source_date": null,
+      "requirement_id": "restroom",
+      "summary": "Accessible toilets are described on several floors. A Changing Places facility is not provided on site."
+    },
+    {
+      "claim": "supports",
+      "excerpt": "An access companion ticket",
+      "source_url": "https://www.britishmuseum.org/visit/accessibility-museum",
+      "source_date": null,
+      "requirement_id": "companion",
+      "summary": "Advance booking is required for a free access companion ticket. This does not confirm dedicated seating."
+    },
+    {
+      "claim": "contradicts",
+      "excerpt": "unable to provide staff assistance",
+      "source_url": "https://www.britishmuseum.org/visit/accessibility-museum",
+      "source_date": null,
+      "requirement_id": "assistance",
+      "summary": "The museum does not provide staff to accompany wheelchair users around the building. Wheelchair loans are a separate facility."
+    }
+  ],
+  "checked_at": "2026-11-06",
+  "venue_name": "The British Museum",
+  "limitations": [
+    "Some galleries lack lift or level access; confirm your particular destination.",
+    "A wheelchair loan does not include staff assistance around the museum.",
+    "Companion seating was not explicitly established by this run.",
+    "No on-site Changing Places facility was identified.",
+    "Advance booking conditions apply; confirm current availability with the venue.",
+    "No explicit publication date was found. These are published claims, not an on-site inspection."
+  ],
+  "official_url": "https://www.britishmuseum.org/visit/accessibility-museum",
+  "id": "british",
+  "mode": "recorded",
+  "provider": "TinyFish TinyAgent / Mako",
+  "run_id": "edbf3e91-fa6e-4683-b2b8-f5fb3b4396e3",
+  "cost_usd": 0.256,
+  "editorial_note": "Agent output shortened and conservatively paraphrased for public display. Broad facility categories are not destination-specific guarantees."
+}
