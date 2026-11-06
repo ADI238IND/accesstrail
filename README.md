@@ -2,19 +2,19 @@
 
 **Check the whole visit, not just the entrance.** AccessTrail uses TinyFish to research official venue accessibility information and turns it into evidence, restrictions, unanswered questions and a venue enquiry.
 
-**[Open the deployed app](https://accesstrail.adityasinghal074.chatgpt.site)** · [Tiny Hacks 2026](https://unstop.com/hackathons/tiny-hacks-vishveshwarya-group-of-institutions-vgi-greater-noida-uttar-pradesh-1771573)
+**[Open the deployed app](https://accesstrail.vercel.app)** · [Tiny Hacks 2026](https://unstop.com/hackathons/tiny-hacks-vishveshwarya-group-of-institutions-vgi-greater-noida-uttar-pradesh-1771573)
 
 Built by **Aditya Singhal** with AI assistance. A working research MVP; no physical inspections, user-study results, partnerships or benchmark accuracy are claimed.
 
 ## Try the complete flow
 
-1. Choose a venue and your practical access requirements. No diagnosis or travel dates are collected.
+1. Choose a venue and your practical access requirements. Mark the ones that are essential for your visit; unresolved essential needs appear first in your visit brief and enquiry. No diagnosis or travel dates are collected.
 2. Explore the latest saved evidence and open its official sources.
 3. Select **Live research · no key needed** and click **Check venue with TinyFish**. The API key stays on the server. A recent completed report is reused, and simultaneous requests join the same investigation.
 4. Reload during a run: this tab resumes checking its job. Completed results persist for future visitors.
 5. Open **Compare venues** to compare published support, restrictions and unknowns against the same requirements. Counts describe information, not a venue safety or suitability rating.
 6. Use **Source check** to retrieve up to three cited pages, check short evidence markers and compare with the previous check. A failed retrieval is never treated as removed information.
-7. Draft an enquiry, download the evidence JSON, print a report or share a link to a venue's latest saved report.
+7. Draft an enquiry, download a portable Markdown visit brief or evidence JSON, print a report or share a link to a venue's latest saved report.
 8. Choose **Conflict demo** to inspect a clearly labelled fictional scenario. Both opposing restroom claims are retained and missing requirements stay unknown.
 
 ## What makes it useful
@@ -71,7 +71,7 @@ The Vercel deployment target serves the application from `public/` and uses a sm
 npm run build:vercel
 ```
 
-`vercel.json` defines the static output, API rewrites, fixture routes, security headers and gateway timeout. `api/gateway.js` forwards only the fixed allowlisted operations to the research backend. It validates same-origin browser requests, strips visitor credentials and preserves quota errors. It cannot proxy arbitrary URLs. The current live link above remains active until a Vercel production deployment is verified.
+`vercel.json` defines the static output, API rewrites, fixture routes, security headers and gateway timeout. `api/gateway.js` forwards only the fixed allowlisted operations to the research backend. It validates same-origin browser requests, strips visitor credentials and preserves quota errors. It cannot proxy arbitrary URLs. The production frontend is hosted on Vercel. The existing Cloudflare service remains the persistent backend. Deployments use the tested source uploaded through the Vercel API; Git import was unavailable during setup.
 
 ## Run locally
 
@@ -103,7 +103,7 @@ npm run validate
 
 ## Validation
 
-The current suite contains **40 checks**, covering evidence states, malformed input, official-domain filtering, durable quotas, concurrent reservation, cache reuse, server-only credentials, unrelated run isolation, persistence, source-check failure handling and quote limits. GitHub Actions runs tests, build and artifact validation on pushes.
+The current suite contains **46 checks**, covering evidence states, malformed input, official-domain filtering, durable quotas, concurrent reservation, cache reuse, server-only credentials, unrelated run isolation, persistence, source-check failure handling and quote limits. GitHub Actions runs tests, build and artifact validation on pushes.
 
 Browser QA covers the report, comparison navigation, enquiry draft, fixture and the production research flow. No statistical extraction-accuracy claim is made from these software tests.
 
@@ -116,6 +116,8 @@ Reports contain public venue information and are shared. Requirement selections 
 The original proposal described a broader Delhi NCR pilot and a 50-case evaluation. This implementation delivers a smaller verifiable MVP; that proposed pilot and evaluation are not claimed as completed.
 
 ## Three-minute demonstration
+
+See [the inspection guide](docs/JUDGING_GUIDE.md) for a reproducible walkthrough and an explicit separation of implemented behavior from uncompleted validation.
 
 - **0:00:** Explain why an entrance label cannot describe the complete visit.
 - **0:25:** Open evidence, show restrictions and check an official source.

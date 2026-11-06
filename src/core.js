@@ -72,7 +72,15 @@ export function compareRequirements(report,selected,host){
  const rows=reduceReport(report,selected,host);
  return {supported:rows.filter(r=>r.state==='supported').length,attention:rows.filter(r=>['conflict','contradicted','conditional'].includes(r.state)).length,unknown:rows.filter(r=>['unknown','failed'].includes(r.state)).length,rows};
 }
-export function enquiry(rows,venue) {
+export function visitBrief(rows,essentialIds=[]) {
+ const essential=rows.filter(r=>essentialIds.includes(r.id));
  const unresolved=rows.filter(r=>r.state!=='supported');
- return 'Hello '+venue+',\n\nI am planning a visit and would appreciate confirmation of these access details:\n\n'+(unresolved.length?unresolved:rows).map((r,i)=>(i+1)+'. '+r.question+(r.state==='conflict'?' The published information includes support and restrictions; please clarify which apply to my route.':'')).join('\n')+'\n\nPlease also let me know about temporary closures or changes to the published information. Thank you.';
+ const essentialUnresolved=essential.filter(r=>r.state!=='supported');
+ const questions=[...essentialUnresolved,...unresolved.filter(r=>!essentialIds.includes(r.id))];
+ return {essential,essentialUnresolved,questions,supported:rows.filter(r=>r.state==='supported'),selectedCount:rows.length};
+}
+export function enquiry(rows,venue,essentialIds=[]) {
+ const unresolved=rows.filter(r=>r.state!=='supported');
+ const ordered=visitBrief(rows,essentialIds).questions;
+ return 'Hello '+venue+',\n\nI am planning a visit and would appreciate confirmation of these access details:\n\n'+(unresolved.length?ordered:rows).map((r,i)=>(i+1)+'. '+(essentialIds.includes(r.id)?'[Essential for my visit] ':'')+r.question+(r.state==='conflict'?' The published information includes support and restrictions; please clarify which apply to my route.':'')).join('\n')+'\n\nPlease also let me know about temporary closures or changes to the published information. Thank you.';
 }
