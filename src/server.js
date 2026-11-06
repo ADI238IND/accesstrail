@@ -28,13 +28,17 @@ export async function api(request,env={}){
    return json({checked_at:new Date().toISOString(),provider:'TinyFish TinyFetch',url:venue.url,checks,notice:'Checks short text markers on one source page only. Missing markers need manual review; accessibility claims are not automatically changed.'});
   }catch{return json({error:'Source verification timed out or failed. Existing evidence is unchanged.'},502);}
  }
- if(path==='/api/research'){
+ if(path==='/api/research'||path==='/api/run'){
   const key=request.headers.get('x-tinyfish-key')||'';
   if(!/^sk-tinyfish-[A-Za-z0-9_-]{10,200}$/.test(key))return json({error:'Connect your TinyFish API key to run live research. Saved evidence needs no key.'},401);
   try{
-   const res=await fetch('https://agent.tinyfish.ai/v1/automation/run-sse',{method:'POST',headers:{'X-API-Key':key,'Content-Type':'application/json'},body:JSON.stringify({url:venue.url,goal:createGoal(venue),api_integration:'accesstrail'}),signal:AbortSignal.timeout(240000)});
+   if(path==='/api/run'&&!/^[A-Za-z0-9_-]{8,100}$/.test(input.run_id||''))return json({error:'Invalid run reference'},400);
+   const polling=path==='/api/run';
+   const res=await fetch(polling?'https://agent.tinyfish.ai/v1/runs/'+input.run_id:'https://agent.tinyfish.ai/v1/automation/run-async',{method:polling?'GET':'POST',headers:{'X-API-Key':key,'Content-Type':'application/json'},...(!polling?{body:JSON.stringify({url:venue.url,goal:createGoal(venue),api_integration:'accesstrail'})}:{}),signal:AbortSignal.timeout(25000)});
    if(!res.ok){return json({error:'TinyFish did not accept the run (HTTP '+res.status+'). Check your key, credits and account limits.'},502);}
-   return new Response(res.body,{headers:{...securityHeaders,'Content-Type':'text/event-stream','Cache-Control':'no-store'}});
+   const d=await res.json();
+   if(!polling){if(!d.run_id)return json({error:'TinyFish did not return a run reference'},502);return json({run_id:d.run_id,status:d.status||'QUEUED'});}
+   return json({run_id:d.run_id||input.run_id,status:d.status,result:d.resultJson??d.result??null,error:d.error?{message:'TinyFish could not complete this investigation. Check the source or provider run.'}:null});
   }catch{return json({error:'Could not start TinyFish. Please try again; no result has been substituted.'},502);}
  }
  return json({error:'Not found'},404);

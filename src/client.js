@@ -40,19 +40,26 @@ $('research').onclick=async()=>{
  if(m==='saved'){current=venue().id==='british'?RECORDED:null;render();setView('evidence');status(current?'Saved genuine TinyFish evidence loaded. No new run was started.':'No saved run is available. Select live research.',!current);return;}
  if(!key){connect();status('Connect your TinyFish key, then click Run live research.');return;}
  busy=true;$('research').disabled=true;$('venue').disabled=true;$('run-mode').disabled=true;$('research').lastElementChild.innerHTML='<span class="spinner" aria-hidden="true"></span>';status('Starting TinyFish. This may take a few minutes…');
- let completed=false,runId='',buffer='';const started=Date.now();
+ let runId='';const started=Date.now();
  try{
-  const res=await fetch('/api/research',{method:'POST',headers:{'Content-Type':'application/json','X-Tinyfish-Key':key},body:JSON.stringify({venue:venue().id})});
-  if(!res.ok){const d=await res.json();throw Error(d.error||'Run could not start');}
-  const reader=res.body.getReader(),decoder=new TextDecoder();
-  const consume=line=>{if(!line.startsWith('data:'))return;let e;try{e=JSON.parse(line.slice(5).trim());}catch{return;}runId=e.run_id||runId;if(e.purpose)status('TinyFish: '+String(e.purpose).slice(0,220));if(['ERROR','FAILED'].includes(e.type))throw Error('TinyFish run failed. No result has been substituted.');if(e.type==='COMPLETE'){
-   if(e.status&&e.status!=='COMPLETED')throw Error('TinyFish finished without a completed result ('+e.status+').');
-   const result=parseResult(e);if(!result)throw Error('TinyFish returned an incomplete evidence schema. Please inspect the run.');
-   current={...result,mode:'live',provider:'TinyFish TinyAgent',run_id:runId,checked_at:new Date().toISOString(),duration_seconds:Math.round((Date.now()-started)/1000)};completed=true;render();setView('evidence');status('Live research complete. Inspect the source context and limitations.');
-  }};
-  while(true){const {done,value}=await reader.read();if(done)break;buffer+=decoder.decode(value,{stream:true});const lines=buffer.split(/\r?\n/);buffer=lines.pop();for(const line of lines)consume(line);}if(buffer)consume(buffer);
-  if(!completed)throw Error('The stream ended without a completed evidence result. Your previous report is unchanged.');
- }catch(e){status(e.message,true);}finally{busy=false;$('research').disabled=false;$('venue').disabled=false;$('run-mode').disabled=false;$('research').lastElementChild.textContent='↗';}
+  const headers={'Content-Type':'application/json','X-Tinyfish-Key':key};
+  const res=await fetch('/api/research',{method:'POST',headers,body:JSON.stringify({venue:venue().id})});
+  const start=await res.json();if(!res.ok)throw Error(start.error||'Run could not start');
+  runId=start.run_id;status('TinyFish investigation started. Run '+runId+'\nChecking progress in the background…');
+  let completed=false;
+  for(let attempt=0;attempt<120;attempt++){
+   await new Promise(resolve=>setTimeout(resolve,3000));
+   const poll=await fetch('/api/run',{method:'POST',headers,body:JSON.stringify({venue:venue().id,run_id:runId})});
+   const e=await poll.json();if(!poll.ok)throw Error(e.error||'Could not check the research run.');
+   if(['FAILED','CANCELLED','TIMED_OUT'].includes(e.status))throw Error('TinyFish finished without a completed result ('+e.status+'). Run '+runId);
+   if(e.status==='COMPLETED'){
+    const result=parseResult(e);if(!result)throw Error('TinyFish returned an incomplete evidence schema. Run '+runId);
+    current={...result,mode:'live',provider:'TinyFish TinyAgent',run_id:runId,checked_at:new Date().toISOString(),duration_seconds:Math.round((Date.now()-started)/1000)};completed=true;render();setView('evidence');status('Live research complete. Inspect the source context and limitations.');break;
+   }
+   status('TinyFish: '+(e.status||'RUNNING')+' · '+Math.round((Date.now()-started)/1000)+' seconds\nRun '+runId);
+  }
+  if(!completed)throw Error('This investigation is taking longer than expected. Run '+runId+' may still be active in your TinyFish dashboard. Your previous report is unchanged.');
+ }catch(e){status(e.message+(runId?'\nRun reference: '+runId:''),true);}finally{busy=false;$('research').disabled=false;$('venue').disabled=false;$('run-mode').disabled=false;$('research').lastElementChild.textContent='↗';}
 };
 $('refresh').onclick=async()=>{if(current?.mode==='fixture'){$('changes-result').textContent='This is a controlled fixture. Live source checks apply to real venues.';return;}const b=$('refresh');b.disabled=true;$('changes-result').textContent='TinyFetch is retrieving the official source…';try{const r=await fetch('/api/refresh',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({venue:venue().id})});const d=await r.json();if(!r.ok)throw Error(d.error);$('changes-result').textContent='Checked '+d.checked_at+'\n'+(d.checks.length?d.checks.map(c=>REQUIREMENTS.find(r=>r.id===c.requirement_id).label+': '+(c.found?'marker found':'marker not found — review source')).join('\n'):'Page retrieved. No saved markers exist for this venue.')+'\n\n'+d.notice;}catch(e){$('changes-result').textContent=e.message;}finally{b.disabled=false;}};
 $('close-enquiry').onclick=()=>$('enquiry-dialog').close();$('copy-enquiry').onclick=async()=>{try{await navigator.clipboard.writeText($('enquiry-text').value);$('copy-enquiry').textContent='Copied ✓';}catch{$('enquiry-text').select();$('copy-enquiry').textContent='Select and copy text';}};

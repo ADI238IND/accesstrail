@@ -21,7 +21,7 @@ A ramp does not establish a step-free route to a particular gallery or restroom.
 
 ## TinyFish integration and provenance
 
-- Live agent: `POST https://agent.tinyfish.ai/v1/automation/run-sse` with a bounded natural-language research goal and a fixed venue URL; stream progress and parse the completed structured evidence.
+- Live agent: `POST https://agent.tinyfish.ai/v1/automation/run-async` starts a bounded read-only research goal on a fixed venue URL. The app polls `GET /v1/runs/{id}` through its backend, avoiding reliance on a long-lived browser stream.
 - Source check: `POST https://api.fetch.tinyfish.ai` retrieves the selected official source. A server-side key is configured separately from source code.
 - Genuine saved run: `edbf3e91-fa6e-4683-b2b8-f5fb3b4396e3` (TinyFish dashboard access may require the owner's sign-in).
 - Observed dashboard run cost: **$0.256**, one run only; this is not a general cost estimate.
@@ -52,7 +52,7 @@ Production is a standard Fetch API Worker module at `dist/server/index.js`. `scr
 | File | Responsibility |
 | --- | --- |
 | `src/page.html` | Responsive UI, semantic forms, keyboard-accessible tabs, print layout |
-| `src/client.js` | Selection, saved/live modes, SSE consumption, enquiry and JSON export |
+| `src/client.js` | Selection, saved/live modes, background-run polling, enquiry and JSON export |
 | `src/core.js` | Prompt, schema checks, trusted source filtering, deterministic requirement states |
 | `src/server.js` | Same-origin API, TinyFish proxy, source-marker verification |
 | `evidence/british-museum.json` | Genuine recorded research with source links and provenance |
